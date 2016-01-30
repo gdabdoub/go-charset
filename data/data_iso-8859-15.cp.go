@@ -4,10 +4,11 @@
 package data
 
 import (
-	"code.google.com/p/go-charset/charset"
 	"io"
 	"io/ioutil"
 	"strings"
+
+	"github.com/ezoic/go-charset/charset"
 )
 
 func init() {

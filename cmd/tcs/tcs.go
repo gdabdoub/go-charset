@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/go-charset/charset"
-	_ "code.google.com/p/go-charset/charset/iconv"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/ezoic/go-charset/charset"
+	_ "github.com/ezoic/go-charset/charset/iconv"
 )
 
 var listFlag = flag.Bool("l", false, "list available character sets")

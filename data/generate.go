@@ -18,7 +18,7 @@ import (
 )
 
 type info struct {
-	Path    string
+	Path string
 }
 
 var tfuncs = template.FuncMap{
@@ -36,7 +36,7 @@ var tmpl = template.Must(template.New("").Funcs(tfuncs).Parse(`
 
 	package data
 	import (
-		"code.google.com/p/go-charset/charset"
+		"github.com/ezoic/go-charset/charset"
 		"io"
 		"io/ioutil"
 		"strings"
@@ -74,7 +74,7 @@ func main() {
 	}
 	for _, name := range names {
 		writeFile("data_"+name+".go", tmpl, info{
-			Path:    filepath.Join(dataDir, name),
+			Path: filepath.Join(dataDir, name),
 		})
 	}
 }
