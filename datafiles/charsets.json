@@ -154,11 +154,6 @@
 	"Class": "cp",
 	"Arg": "windows-1252.cp"
 },
-"windows-1256": {
-	"Desc": "MS Windows CP 1256 (Arabic)",
-	"Class": "cp",
-	"Arg": "windows-1256.cp"
-},
 "windows-31j": {
 	"Aliases":["cp932"],
 	"Desc": "MS-Windows Japanese (cp932)",
