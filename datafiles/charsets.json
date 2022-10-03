@@ -154,6 +154,11 @@
 	"Class": "cp",
 	"Arg": "windows-1252.cp"
 },
+"windows-1255": {
+	"Desc": "MS Windows CP 1255 (Hebrew)",
+	"Class": "cp",
+	"Arg": "windows-1255.cp"
+},
 "windows-1256": {
 	"Desc": "MS Windows CP 1256 (Arabic)",
 	"Class": "cp",
