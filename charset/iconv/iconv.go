@@ -12,11 +12,16 @@ package iconv
 
 //#cgo LDFLAGS: -L/opt/local/lib
 //#include <stdlib.h>
-//#include <string.h>
 //#include <iconv.h>
 //#include <errno.h>
 //iconv_t iconv_open_error = (iconv_t)-1;
 //size_t iconv_error = (size_t)-1;
+//
+// size_t bridge_iconv(iconv_t cd,
+//		       char *inbuf, size_t *inbytesleft,
+//                     char *outbuf, size_t *outbytesleft) {
+//   return iconv(cd, &inbuf, inbytesleft, &outbuf, outbytesleft);
+// }
 import "C"
 import (
 	"errors"
@@ -111,67 +116,91 @@ func (iconvFactory) Info(name string) *charset.Charset {
 	}
 }
 
+func go_iconv(cd C.iconv_t, inbuf unsafe.Pointer, inbytesleft C.size_t, outbuf unsafe.Pointer, outbytesleft C.size_t) (C.size_t, error, unsafe.Pointer, C.size_t, unsafe.Pointer, C.size_t) {
+
+	preInbytesleft := inbytesleft
+	preOutbytesleft := outbytesleft
+
+	r, err := C.bridge_iconv(cd, (*C.char)(inbuf), &inbytesleft, (*C.char)(outbuf), &outbytesleft)
+
+	// update the pointers
+	inbuf = unsafe.Add(inbuf, uintptr(preInbytesleft)-uintptr(inbytesleft))
+	outbuf = unsafe.Add(outbuf, uintptr(preOutbytesleft)-uintptr(outbytesleft))
+
+	return r, err, inbuf, inbytesleft, outbuf, outbytesleft
+}
+
 func (p *iconvTranslator) Translate(data []byte, eof bool) (rn int, rd []byte, rerr error) {
-	inbuf := C.CBytes(data)
-	defer C.free(inbuf)
-	inbufPtr := (*C.char)(inbuf)
-	inbytesleft := C.size_t(len(data))
-
-	// allocate space for output buffer
-	outbytesSize := C.size_t(len(data) * utf8.UTFMax)
-	buf := C.malloc(outbytesSize)
-	outbytesWritten := C.size_t(0)
-	defer C.free(buf)
-
 	n := 0
+	p.scratch = p.scratch[:0]
 	for len(data) > 0 {
-		buf, outbytesSize = ensureCap(buf, outbytesSize, outbytesWritten+inbytesleft*utf8.UTFMax)
-		outbytesleft := outbytesSize - outbytesWritten
-		outbufPtr := (*C.char)(unsafe.Add(buf, outbytesWritten))
+		p.scratch = ensureCap(p.scratch, len(p.scratch)+len(data)*utf8.UTFMax)
+		cData := unsafe.Pointer(&data[:1][0])
+		nData := C.size_t(len(data))
 
-		r, err := C.iconv(p.cd, &inbufPtr, &inbytesleft, &outbufPtr, &outbytesleft)
-		outbytesWritten = outbytesSize - outbytesleft
-		n = len(data) - int(inbytesleft)
+		ns := len(p.scratch)
+		cScratch := unsafe.Pointer(&p.scratch[ns : ns+1][0])
+		nScratch := C.size_t(cap(p.scratch) - ns)
+
+		r, err, cData, nData, cScratch, nScratch := go_iconv(p.cd, cData, nData, cScratch, nScratch)
+
+		p.scratch = p.scratch[0 : cap(p.scratch)-int(nScratch)]
+		n += len(data) - int(nData)
+		data = data[len(data)-int(nData):]
 
 		if r != C.iconv_error || err == nil {
-			return n, C.GoBytes(buf, C.int(outbytesWritten)), nil
+			return n, p.scratch, nil
 		}
 		switch err := err.(syscall.Errno); err {
 		case C.EILSEQ:
 			// invalid multibyte sequence - skip one byte and continue
-			return n, C.GoBytes(buf, C.int(outbytesWritten)), err
+			p.scratch = appendRune(p.scratch, p.invalid)
+			n++
+			data = data[1:]
 		case C.EINVAL:
 			// incomplete multibyte sequence
-			return n, C.GoBytes(buf, C.int(outbytesWritten)), err
+			return n, p.scratch, nil
 		case C.E2BIG:
 			// output buffer not large enough; try again with larger buffer.
-			buf, outbytesSize = ensureCap(buf, outbytesSize, outbytesWritten+inbytesleft*utf8.UTFMax+utf8.UTFMax)
-			outbytesleft = outbytesSize - outbytesWritten
+			p.scratch = ensureCap(p.scratch, cap(p.scratch)+utf8.UTFMax)
 		default:
 			panic(fmt.Sprintf("unexpected error code: %v", err))
 		}
 	}
-
-	return n, C.GoBytes(buf, C.int(outbytesWritten)), nil
+	return n, p.scratch, nil
 }
 
 // ensureCap returns s with a capacity of at least n bytes.
 // If cap(s) < n, then it returns a new copy of s with the
 // required capacity.
-func ensureCap(s unsafe.Pointer, currentLen, neededLen C.size_t) (unsafe.Pointer, C.size_t) {
-	if currentLen >= neededLen {
-		return s, currentLen
+func ensureCap(s []byte, n int) []byte {
+	if n <= cap(s) {
+		return s
 	}
-
-	newS := C.malloc(neededLen)
-	C.memcpy(newS, s, currentLen)
-	C.free(unsafe.Pointer(s))
-	return newS, neededLen
+	// logic adapted from appendslice1 in runtime
+	m := cap(s)
+	if m == 0 {
+		m = n
+	} else {
+		for {
+			if m < 1024 {
+				m += m
+			} else {
+				m += m / 4
+			}
+			if m >= n {
+				break
+			}
+		}
+	}
+	t := make([]byte, len(s), m)
+	copy(t, s)
+	return t
 }
 
-// func appendRune(buf []byte, r rune) []byte {
-// 	n := len(buf)
-// 	buf = ensureCap(buf, n+utf8.UTFMax)
-// 	nu := utf8.EncodeRune(buf[n:n+utf8.UTFMax], r)
-// 	return buf[0 : n+nu]
-// }
+func appendRune(buf []byte, r rune) []byte {
+	n := len(buf)
+	buf = ensureCap(buf, n+utf8.UTFMax)
+	nu := utf8.EncodeRune(buf[n:n+utf8.UTFMax], r)
+	return buf[0 : n+nu]
+}
