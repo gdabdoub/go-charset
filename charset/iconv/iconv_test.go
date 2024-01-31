@@ -30,7 +30,7 @@ var tests = []translateTest{
 	{true, "utf-16le", "S0\x8c0o0\"oW[g0Y0\x020", "これは漢字です。"},
 	{true, "utf-16be", "0S0\x8c0oo\"[W0g0Y0\x02", "これは漢字です。"},
 	{true, "utf-8", "♔", "♔"},
-	{false, "utf-8", "a♔é\x80", "a♔é" + string(utf8.RuneError)},
+	{false, "utf-8", "a♔é\x80♔", "a♔é" + string(utf8.RuneError) + "♔"},
 	{true, "latin1", "\xa35 for Pepp\xe9", "£5 for Peppé"},
 }
 
