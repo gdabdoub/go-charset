@@ -135,7 +135,7 @@
 	"Arg": "le"
 },
 "utf-8": {
-	"Aliases":["utf8", "ascii", "us-ascii"],
+	"Aliases":["utf8", "ascii", "us-ascii", "utf8mb4"],
 	"Desc": "Unicode UTF-8",
 	"Class": "utf8"
 },

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 // We just use a list of names obtained from iconv on a platform
@@ -169,7 +170,7 @@ var aliasData = [][]string{
 	{"utf-32"},
 	{"utf-32be"},
 	{"utf-32le"},
-	{"utf-8"},
+	{"utf-8", "utf8mb4"},
 	{"utf-8-mac", "utf8-mac"},
 	{"viscii", "viscii1.1-1", "csviscii"},
 	{"windows-31j", "cp932"},

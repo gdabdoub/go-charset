@@ -43,7 +43,7 @@ func main() {
 		var err error
 		f, err = os.Open(flag.Arg(0))
 		if err != nil {
-			fatalf("cannot open %q: %v", err)
+			fatalf("cannot open: %v", err)
 		}
 	}
 	r, err := charset.NewReader(*fromCharset, f)
