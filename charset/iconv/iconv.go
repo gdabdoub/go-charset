@@ -139,7 +139,17 @@ func (p *iconvTranslator) Translate(data []byte, eof bool) (rn int, rd []byte, r
 		switch err := err.(syscall.Errno); err {
 		case C.EILSEQ:
 			// invalid multibyte sequence - skip one byte and continue
-			return n, C.GoBytes(buf, C.int(outbytesWritten)), err
+			buf, outbytesSize = ensureCap(buf, outbytesSize, outbytesWritten+inbytesleft*utf8.UTFMax+utf8.UTFMax)
+			outbytesleft = outbytesSize - outbytesWritten
+			outbufPtr = (*C.char)(unsafe.Add(buf, outbytesWritten))
+
+			nu := appendRune(outbufPtr, p.invalid)
+			outbytesWritten += nu
+			outbytesleft -= nu
+			inbytesleft--
+			inbufPtr = (*C.char)(unsafe.Add(unsafe.Pointer(inbufPtr), 1))
+			n++
+
 		case C.EINVAL:
 			// incomplete multibyte sequence
 			return n, C.GoBytes(buf, C.int(outbytesWritten)), err
@@ -169,9 +179,14 @@ func ensureCap(s unsafe.Pointer, currentLen, neededLen C.size_t) (unsafe.Pointer
 	return newS, neededLen
 }
 
-// func appendRune(buf []byte, r rune) []byte {
-// 	n := len(buf)
-// 	buf = ensureCap(buf, n+utf8.UTFMax)
-// 	nu := utf8.EncodeRune(buf[n:n+utf8.UTFMax], r)
-// 	return buf[0 : n+nu]
-// }
+func appendRune(s *C.char, r rune) C.size_t {
+	buf := make([]byte, utf8.UTFMax)
+	nu := utf8.EncodeRune(buf, r)
+
+	// i really hate this
+	smallAlloc := C.CBytes(buf[:nu])
+	defer C.free(smallAlloc)
+
+	C.memcpy(unsafe.Pointer(s), smallAlloc, C.size_t(nu))
+	return C.size_t(nu)
+}
